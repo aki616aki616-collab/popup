@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KABAG POPUP STORE スケジュール</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif; background: #fff; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState } = React;
+
+const FIXED_STAFF = ["林", "歸山", "伊藤", "金本", "辻川", "山名", "野澤"];
+const INITIAL_CUSTOM = ["スタッフ１", "スタッフ２", "スタッフ３", "スタッフ４", "スタッフ５"];
+
+const STAFF_COLORS = {
+  "林": "#2563eb", "歸山": "#dc2626", "伊藤": "#059669", "金本": "#d97706",
+  "辻川": "#7c3aed", "山名": "#0891b2", "野澤": "#be185d",
+};
+const CUSTOM_COLORS = ["#64748b", "#78716c", "#57534e", "#475569", "#6b7280"];
+
+function getColor(name, customStaff) {
+  if (STAFF_COLORS[name]) return STAFF_COLORS[name];
+  const idx = customStaff.indexOf(name);
+  return idx >= 0 ? CUSTOM_COLORS[idx] : "#888";
+}
+
+const SCHEDULE = [
+  {
+    date: "3/10", dow: "月", label: "前日設営", type: "setup",
+    slots: [
+      { time: "日中", task: "荷物搬入（3/10着で発送）", note: "台車利用可・御堂筋側に停車して搬入", staff: [] },
+      { time: "〜19:00", task: "前出店者 閉店・片付け", note: "前の出店者が撤去完了するまで待機", staff: [] },
+      { time: "20:00〜23:00", task: "陳列・設営作業", note: "★作業届 提出必要｜レジセット・釣銭(5万円)準備", staff: [] },
+    ],
+  },
+  {
+    date: "3/11", dow: "火", label: "1日目", type: "event",
+    slots: [
+      { time: "9:00", task: "入店・開店準備", note: "レジ確認・釣銭セット・陳列最終チェック", staff: [] },
+      { time: "10:00〜20:00", task: "営業", note: "初日：スタッフがレジ締め作業を案内", staff: [] },
+      { time: "20:00〜", task: "レジ締め・入金", note: "3F入金機で現金入金→釣銭を5万円に戻す", staff: [] },
+    ],
+  },
+  {
+    date: "3/12", dow: "水", label: "2日目", type: "event",
+    slots: [
+      { time: "9:00", task: "入店・開店準備", note: "", staff: [] },
+      { time: "10:00〜20:00", task: "営業", note: "", staff: [] },
+      { time: "20:00〜", task: "レジ締め・入金", note: "", staff: [] },
+    ],
+  },
+  {
+    date: "3/13", dow: "木", label: "3日目", type: "event",
+    slots: [
+      { time: "9:00", task: "入店・開店準備", note: "", staff: [] },
+      { time: "10:00〜20:00", task: "営業", note: "", staff: [] },
+      { time: "20:00〜", task: "レジ締め・入金", note: "", staff: [] },
+    ],
+  },
+  {
+    date: "3/14", dow: "金", label: "4日目", type: "event",
+    slots: [
+      { time: "9:00", task: "入店・開店準備", note: "", staff: [] },
+      { time: "10:00〜20:00", task: "営業", note: "", staff: [] },
+      { time: "20:00〜", task: "レジ締め・入金", note: "", staff: [] },
+    ],
+  },
+  {
+    date: "3/15", dow: "土", label: "5日目 ★週末", type: "weekend",
+    slots: [
+      { time: "9:00", task: "入店・開店準備", note: "", staff: [] },
+      { time: "10:00〜20:00", task: "営業", note: "★土曜：来客多い見込み", staff: [] },
+      { time: "20:00〜", task: "レジ締め・入金", note: "", staff: [] },
+    ],
+  },
+  {
+    date: "3/16", dow: "日", label: "6日目 ★週末", type: "weekend",
+    slots: [
+      { time: "9:00", task: "入店・開店準備", note: "", staff: [] },
+      { time: "10:00〜20:00", task: "営業", note: "★日曜：エスカレーター前 人通り多い", staff: [] },
+      { time: "20:00〜", task: "レジ締め・入金", note: "", staff: [] },
+    ],
+  },
+  {
+    date: "3/17", dow: "月", label: "最終日＋撤去", type: "teardown",
+    slots: [
+      { time: "9:00", task: "入店・開店準備", note: "", staff: [] },
+      { time: "10:00〜19:00", task: "営業（早めに閉店可）", note: "客足見てレジ締めタイミング判断", staff: [] },
+      { time: "19:00〜23:00", task: "撤去・搬出", note: "★作業届 提出必要｜23時までに完全退館", staff: [] },
+    ],
+  },
+];
+
+const TYPE_STYLES = {
+  setup:    { border: "#ef4444", bg: "#fef2f2", badge: "#ef4444" },
+  event:    { border: "#3b82f6", bg: "#f8faff", badge: "#3b82f6" },
+  weekend:  { border: "#a855f7", bg: "#faf5ff", badge: "#a855f7" },
+  teardown: { border: "#f59e0b", bg: "#fffbeb", badge: "#f59e0b" },
+};
+
+function App() {
+  const [schedule, setSchedule] = useState(SCHEDULE);
+  const [customStaff, setCustomStaff] = useState(INITIAL_CUSTOM);
+
+  const allStaff = [...FIXED_STAFF, ...customStaff];
+
+  function updateCustomName(idx, newName) {
+    const oldName = customStaff[idx];
+    setCustomStaff(prev => { const n = [...prev]; n[idx] = newName; return n; });
+    setSchedule(prev => {
+      const ns = JSON.parse(JSON.stringify(prev));
+      ns.forEach(d => d.slots.forEach(s => { s.staff = s.staff.map(n => n === oldName ? newName : n); }));
+      return ns;
+    });
+  }
+
+  function addStaff(dayIdx, slotIdx, name) {
+    if (!name) return;
+    setSchedule(prev => {
+      const n = JSON.parse(JSON.stringify(prev));
+      if (!n[dayIdx].slots[slotIdx].staff.includes(name)) n[dayIdx].slots[slotIdx].staff.push(name);
+      return n;
+    });
+  }
+
+  function removeStaff(dayIdx, slotIdx, name) {
+    setSchedule(prev => {
+      const n = JSON.parse(JSON.stringify(prev));
+      n[dayIdx].slots[slotIdx].staff = n[dayIdx].slots[slotIdx].staff.filter(s => s !== name);
+      return n;
+    });
+  }
+
+  return (
+    <div style={{
+      background: "#fff", minHeight: "100vh", padding: "16px 10px", color: "#1a1a1a",
+      maxWidth: 620, margin: "0 auto",
+    }}>
+      <div style={{ textAlign: "center", marginBottom: 16, paddingBottom: 12, borderBottom: "2px solid #ddd" }}>
+        <div style={{ display: "inline-block", background: "#111", color: "#fff", padding: "2px 14px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: 2, marginBottom: 4 }}>KABAG POPUP STORE</div>
+        <h1 style={{ fontSize: 19, fontWeight: 800, margin: "4px 0 2px" }}>丸井 出展スケジュール</h1>
+        <p style={{ color: "#888", fontSize: 12, margin: 0 }}>2025年3月10日（設営）〜 3月17日（撤去）</p>
+      </div>
+
+      <div style={{ background: "#fffde7", border: "1px solid #fde68a", borderRadius: 8, padding: "10px 12px", marginBottom: 14 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#92400e", marginBottom: 6 }}>📌 重要事項</div>
+        {[
+          ["📦","荷物は3/10着・元払いで発送（着払い不可）"],
+          ["🚗","駐車場 8:30〜21:30 ※自家用車は申請必要"],
+          ["💰","釣銭5万円を準備（3F両替機あり・緑カード必要）"],
+          ["📋","作業届：設営(3/10)＋撤去(3/17)の計2枚提出"],
+          ["🧾","レジ：Steraを使用（動画マニュアルあり）"],
+          ["🛍","ショッパー：持込み｜免税：対象外"],
+        ].map(([ic, tx], i) => (
+          <div key={i} style={{ display: "flex", gap: 6, fontSize: 12, color: "#78350f", marginBottom: 2 }}>
+            <span>{ic}</span><span>{tx}</span>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 8, padding: "8px 12px", marginBottom: 16 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: "#999", marginBottom: 5 }}>✏️ スタッフ名を編集（タップで変更可）</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+          {customStaff.map((name, idx) => (
+            <input key={idx} value={name} onChange={e => updateCustomName(idx, e.target.value)}
+              style={{ width: 90, padding: "3px 6px", borderRadius: 5, border: "1px solid #ccc", fontSize: 12, textAlign: "center", background: "#fff" }} />
+          ))}
+        </div>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {schedule.map((day, dayIdx) => {
+          const ts = TYPE_STYLES[day.type];
+          return (
+            <div key={dayIdx} style={{ border: "2px solid "+ts.border, borderRadius: 10, overflow: "hidden" }}>
+              <div style={{ background: ts.badge, color: "#fff", padding: "8px 12px", display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ fontSize: 20, fontWeight: 900, minWidth: 48 }}>{day.date}</div>
+                <div>
+                  <span style={{ fontSize: 10, background: "rgba(255,255,255,0.25)", padding: "1px 7px", borderRadius: 3, fontWeight: 600, marginRight: 6 }}>{day.dow}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700 }}>{day.label}</span>
+                </div>
+              </div>
+              <div style={{ background: ts.bg, padding: "6px 10px" }}>
+                {day.slots.map((slot, slotIdx) => (
+                  <div key={slotIdx} style={{ padding: "7px 0", borderBottom: slotIdx < day.slots.length - 1 ? "1px solid rgba(0,0,0,0.06)" : "none" }}>
+                    <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: ts.badge, minWidth: 85, flexShrink: 0, paddingTop: 1 }}>{slot.time}</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "#222" }}>{slot.task}</div>
+                        {slot.note && <div style={{ fontSize: 10, color: "#999", marginTop: 1 }}>{slot.note}</div>}
+                        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center", marginTop: 4 }}>
+                          {slot.staff.map(s => (
+                            <span key={s} onClick={() => removeStaff(dayIdx, slotIdx, s)} title="タップで削除"
+                              style={{ display: "inline-flex", alignItems: "center", gap: 2, padding: "1px 9px", borderRadius: 12, background: getColor(s, customStaff), color: "#fff", fontSize: 11, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+                              {s} ✕
+                            </span>
+                          ))}
+                          <select value="" onChange={e => { addStaff(dayIdx, slotIdx, e.target.value); }}
+                            style={{ fontSize: 11, padding: "2px 4px", borderRadius: 5, border: "1px solid #ccc", background: "#fff", color: "#666", cursor: "pointer" }}>
+                            <option value="">＋担当者</option>
+                            {allStaff.filter(s => !slot.staff.includes(s)).map(s => (
+                              <option key={s} value={s}>{s}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ marginTop: 16, padding: "12px", background: "#f3f4f6", borderRadius: 8, border: "1px solid #e5e7eb" }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: "#999", marginBottom: 6 }}>⏰ 基本タイムライン</div>
+        <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "2px 12px", fontSize: 12 }}>
+          {[["8:30","最早入館（申請時のみ）"],["9:00","入店可能"],["10:00","開店"],["20:00","閉店（最終日は19:00目安）"],["20:00〜","レジ締め → 3F入金機で入金"],["23:00","最終退館"]].map(([t,d],i) => (
+            <React.Fragment key={i}>
+              <span style={{ color: "#2563eb", fontWeight: 700 }}>{t}</span>
+              <span style={{ color: "#666" }}>{d}</span>
+            </React.Fragment>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ textAlign: "center", marginTop: 12, fontSize: 10, color: "#bbb" }}>
+        ※ プルダウンで担当者を追加 ／ バッジをタップで削除
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.render(<App />, document.getElementById("root"));
+</script>
+</body>
+</html>
